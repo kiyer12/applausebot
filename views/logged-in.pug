@@ -1,0 +1,18 @@
+html
+    include head.pug
+    body
+        h1 
+            a(href="/") ApplauseBot
+        p A live soundboard for calls
+        p(style="color: #ff0000") #{message}            
+        p(style="color: #AAAAAA") Welcome #{email}
+        form(action="/connect")
+            label(for="number")
+                input(
+                    name="number"
+                    type="text"
+                    required
+                    placeholder="ex: +14086380968,,7323580#"
+                )
+                button(type="submit" id="submit-dream") Start a Call                    
+    //- include foot.pug
