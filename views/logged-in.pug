@@ -4,9 +4,15 @@ html
         h1 
             a(href="/") ApplauseBot
         p A live soundboard for calls
-        p(style="color: #ff0000") #{message}            
-        p(style="color: #AAAAAA") Welcome #{email}
-        form(action="/connect")
+            if email
+                 span(style="color: #AAAAAA") - #{email}
+        p(style="color: #ff0000") #{error}
+        if status && status === "callStarted"
+            p(style="color: #33cc33") Call started. 
+                - var url = newCallUrl
+                a(href=`${url}`) Link
+        p(style="color: #ff0000") #{error}
+        form(action="/startcall", method="POST")
             label(for="number")
                 input(
                     name="number"

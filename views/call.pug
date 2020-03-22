@@ -1,0 +1,43 @@
+html
+    include head.pug
+    body
+        h1 
+            a(href="/") ApplauseBot
+        p A live soundboard for calls
+            if email
+                 span(style="color: #AAAAAA") - #{email}
+        p This is the call screen, yay
+        if error
+            p #{error}
+        div(id="result")
+        form
+            label(for="sound")
+                select(name="sound", id="soundSelector")
+                    option(value="applause") Applause
+                    option(value="Ding") Ding
+                    option(value="Loud Ding") Loud Ding                    
+                button(id="submitplay") Play Sound in Calls
+        script.
+            var callId = "#{callId}";
+            $( document ).ready(
+            function() {
+                console.log( "ready!" );
+                $( "#submitplay" ).click(function( event ) {
+                    //- alert( "Handler for .submit() called." );
+                    event.preventDefault();
+                    console.log("hello: "+$("#soundSelector").val());
+                    //- $.post( , );
+                    var data = { "callId": callId, "sound": "default" };
+                    var url = "/c/" + callId + "/play";
+                    $.ajax({
+                        type: "POST",
+                        url: url,
+                        data: data,
+                        success: function( data ) {
+                            console.log("result came back");
+                            $( "#result" ).html( data );
+                        },
+                        dataType: "json"
+                    });
+                });
+            });

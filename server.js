@@ -5,6 +5,8 @@ const shortid = require('shortid');
 const low = require('lowdb')
 const FileSync = require('lowdb/adapters/FileSync')
 
+const doRealTwilio = false;
+
 const app = express();
 app.use(session(
   {
@@ -36,6 +38,7 @@ function isAuthed(sess) {
 
 // Compile our templates
 const compiledLoggedInPage = pug.compileFile(__dirname + "/views/logged-in.pug");
+const compiledCallPage = pug.compileFile(__dirname + "/views/call.pug");
 
 // make all the files in 'public' available
 app.use(express.static("public"));
@@ -78,7 +81,7 @@ app.post("/voiceXML", (request, response) => {
   response.sendFile(__dirname + "/public/voice.xml");
 });
 
-app.get("/connect", (request, response) => {
+app.post("/startcall", (request, response) => {
 
   if (!isAuthed(request.session)) {
     console.log("not authorized in connect");
@@ -95,36 +98,112 @@ app.get("/connect", (request, response) => {
     statusCallbackMethod: 'POST'
   };
 
-  var number = request.query.number;
-  numberParts = number.split(",,");
-  createParams['to'] = numberParts[0];
-
-  var digitsToSend, numberItself;
-  numberItself = numberParts[0];
-  
+  numberParts = request.body.number.split(",,");
+  createParams['to'] = numberParts[0];  
   if (numberParts.length > 1)  {
-    digitsToSend = numberParts[1];
     createParams['sendDigits'] = digitsToSend;
   }
 
   console.log(createParams);
   console.log('twilio client now');
-  /*
-  twilioClient.calls
-  .create(createParams)
-  .then(call => console.log(call.sid));
-  */
-  console.log(shortid.generate());
   var botId = shortid.generate();
   var callURL = process.env.SELF_URL + "c/" + botId;
-  var message = "call to "+number+" complete.";
-  message += " " + callURL;
 
-  // db.get('calls')
-  // .push({ id: 1, url: callURL, botId: botId, twilioCallId: 'temp'})
-  // .write();
+  if (doRealTwilio) {
+    twilioClient.calls
+    .create(createParams)
+    .then(call => {
+      db.get('calls')
+      .push({ 
+        id: 1, 
+        url: callURL, 
+        botId: botId, 
+        twilioCallId: call.sid,
+        dateTime: new Date().toString()
+      })
+      .write();
+    
+      response.send(compiledLoggedInPage({ 
+        "email": request.session.email,
+        "newCallUrl": callURL,
+        "status": "callStarted"
+      }));
+    });
+  }
+  else {
+    // Do the same thing, just use "temp" for the callId.
+    db.get('calls')
+    .push({ 
+      id: 1, 
+      url: callURL, 
+      botId: botId, 
+      twilioCallId: 'mockValue',
+      dateTime: new Date().toString()
+    })
+    .write();
+  
+    response.send(compiledLoggedInPage({ 
+      "email": request.session.email,
+      "newCallUrl": callURL,
+      "status": "callStarted"
+    }));
+  }
+});
 
-  response.send(compiledLoggedInPage({ "message": message}));
+app.get("/c/:callId", (request, response) => {
+  console.log(request.params.callId);
+  var call = db.get('calls')
+  .find({ botId:  request.params.callId})
+  .value();
+
+  if (!call) {
+    response.send(compiledCallPage({ 
+      error: "Link has expired."
+    }));      
+    return;
+  }
+  console.log(call.twilioCallId);
+
+  response.send(compiledCallPage({ 
+    "callId": request.params.callId
+    // "email": request.session.email,
+    // "newCallUrl": callURL,
+    // "status": "callStarted"
+  }));
+});
+
+app.post("/c/:callId/:action", (request, response) => {
+  console.log(request.params.callId);
+  var call = db.get('calls')
+  .find({ botId:  request.params.callId})
+  .value();
+
+  if (!call) {
+    response.send(compiledCallPage({ 
+      error: "Link has expired."
+    }));      
+    return;
+  }
+  console.log(call.twilioCallId);
+  
+  if (request.params.action === 'play') {
+    console.log("playing a sound");
+    /*
+    twilioClient.calls(call.twilioCallId)
+    .update({twiml: '<Response><Say>Ahoy there</Say></Response>'})
+    .then(call => console.log(call.to));  
+    */
+    var resp = {
+      "status": "complete",
+    };
+    response.json(resp);
+  }
+  else {
+    var resp = {
+      "status": "unknown action: " + request.params.action,
+    };
+    response.json(resp);
+  }
 });
 
 // listen for requests :)
