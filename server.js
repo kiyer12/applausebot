@@ -5,7 +5,13 @@ const shortid = require('shortid');
 const low = require('lowdb')
 const FileSync = require('lowdb/adapters/FileSync')
 
-const doRealTwilio = false;
+const sounds = {
+  "applause": "Applause",
+  "goodmusic": "Never Gonna Give You Up",
+  "cheer": "Cheer",
+};
+
+const doRealTwilio = true;
 
 const app = express();
 app.use(session(
@@ -75,10 +81,8 @@ app.post("/twilioCallback", (request, response) => {
   response.json([]);
 });
 
-//Endpoint for hosting the twiml -> probably can submit this directly
-//TODO: investigate and fix
-app.post("/voiceXML", (request, response) => {
-  response.sendFile(__dirname + "/public/voice.xml");
+app.post("/twiml/:name", (request, response) => {
+  response.sendFile(__dirname + "/public/" + request.params.name + ".xml");
 });
 
 app.post("/startcall", (request, response) => {
@@ -92,23 +96,23 @@ app.post("/startcall", (request, response) => {
   }
 
   var createParams = {
-    url: process.env.SELF_URL+'voiceXML',
-    from: '+12532992127',
+    url: process.env.SELF_URL+'twiml/silent-loop',
+    from: process.env.TWILIO_FROM_NUMBER,
     statusCallback: process.env.SELF_URL+'twilioCallback',
     statusCallbackMethod: 'POST'
   };
 
-  numberParts = request.body.number.split(",,");
+  var numberParts = request.body.number.split(",,");
   createParams['to'] = numberParts[0];  
   if (numberParts.length > 1)  {
-    createParams['sendDigits'] = digitsToSend;
+    createParams['sendDigits'] = numberParts[1];
   }
 
   console.log(createParams);
   console.log('twilio client now');
   var botId = shortid.generate();
   var callURL = process.env.SELF_URL + "c/" + botId;
-
+  
   if (doRealTwilio) {
     twilioClient.calls
     .create(createParams)
@@ -163,13 +167,19 @@ app.get("/c/:callId", (request, response) => {
     return;
   }
   console.log(call.twilioCallId);
+  console.log(call.dateTime);
 
-  response.send(compiledCallPage({ 
-    "callId": request.params.callId
-    // "email": request.session.email,
-    // "newCallUrl": callURL,
-    // "status": "callStarted"
-  }));
+  console.log(sounds);
+  twilioClient.calls(call.twilioCallId)
+  .fetch()
+  .then(twCall => {
+    response.send(compiledCallPage({ 
+      "status": twCall.status,
+      "email": request.session.email,
+      "twCall": twCall,
+      "sounds": sounds,
+      "call": call    }));    
+  });
 });
 
 app.post("/c/:callId/:action", (request, response) => {
@@ -180,19 +190,33 @@ app.post("/c/:callId/:action", (request, response) => {
 
   if (!call) {
     response.send(compiledCallPage({ 
-      error: "Link has expired."
+      error: "Link has expired or the call is no longer valid."
     }));      
     return;
   }
-  console.log(call.twilioCallId);
-  
+
   if (request.params.action === 'play') {
     console.log("playing a sound");
-    /*
-    twilioClient.calls(call.twilioCallId)
-    .update({twiml: '<Response><Say>Ahoy there</Say></Response>'})
-    .then(call => console.log(call.to));  
-    */
+    if (doRealTwilio) {
+      console.log("twilioCallId: "+call.twilioCallId);
+      console.log(request.body.sound);
+      var soundName = "applause";
+      if (request.body.sound in sounds) {
+        soundName = request.body.sound;
+      }
+      twilioClient.calls(call.twilioCallId)
+      .update({
+        url: process.env.SELF_URL + 'twiml/' + soundName,
+      })
+      .then(call => {
+        console.log(call.to);
+      },
+      reason => {
+        console.log('reason');
+        console.log(reason);
+      }
+      );
+    }
     var resp = {
       "status": "complete",
     };
@@ -208,5 +232,5 @@ app.post("/c/:callId/:action", (request, response) => {
 
 // listen for requests :)
 const listener = app.listen(process.env.PORT, () => {
-  console.log("Your app is listening on port " + listener.address().port);
+  console.log("Listening on port " + listener.address().port);
 });

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Say voice="alice">Good music incoming!</Say>
-    <Play>http://demo.twilio.com/docs/classic.mp3</Play>
+    <Pause></Pause>
+   <Play>http://demo.twilio.com/docs/classic.mp3</Play>
 </Response>
