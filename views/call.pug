@@ -3,44 +3,15 @@ html
     body
         h1 
             a(href="/") ApplauseBot
-                span(style="color: gray") A live soundboard for calls
+        p(style="color: gray; left-margin:10px;") A live soundboard for calls
         if email
             span(style="color: #AAAAAA") - #{email}
             a(href="") Log Out
         if error
             p #{error}
-        p(style="color: #333333") #{twCall.to}: started #{call.dateTime} 
-        if twCall.status === "completed"
-            p(style="color:gray") Call is complete. No further sounds can be played.
-        div(id="result")
-        form
-            label(for="sound")
-                select(name="sound", id="soundSelector")
-                    each val, index in sounds
-                        option(value=index) #{val}
-                button(id="submitplay") Play Sound in Call
+        div(id="soundboard")
+        include react.pug
+        script(src="/moment.min.js")
+        script(src="/soundboard.js" type="text/babel")
         script.
             var callId = "#{call.botId}";
-            $( document ).ready(
-            function() {
-                console.log( "ready!" );
-                $( "#submitplay" ).click(function( event ) {
-                    //- alert( "Handler for .submit() called." );
-                    event.preventDefault();
-                    console.log("sound selected: "+$("#soundSelector").val());
-                    //- $.post( , );
-                    var data = { "callId": callId, "sound": $("#soundSelector").val() };
-                    var url = "/c/" + callId + "/play";
-                    $.ajax({
-                        type: "POST",
-                        url: url,
-                        data: data,
-                        success: function( data ) {
-                            console.log("result came back");
-                            console.log(data);
-                            $( "#result" ).html( data );
-                        },
-                        dataType: "json"
-                    });
-                });
-            });

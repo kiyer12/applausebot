@@ -4,14 +4,10 @@ const pug = require('pug');
 const shortid = require('shortid');
 const low = require('lowdb')
 const FileSync = require('lowdb/adapters/FileSync')
+const zoomParse = require('./zoom-invite-parser.js')
+const soundList = require('./sound-list.js')
 
-const sounds = {
-  "applause": "Applause",
-  "goodmusic": "Never Gonna Give You Up",
-  "cheer": "Cheer",
-};
-
-const doRealTwilio = true;
+const doRealTwilio = false;
 
 const app = express();
 app.use(session(
@@ -51,7 +47,6 @@ app.use(express.static("public"));
 
 app.get("/", (request, response) => {
   if (isAuthed(request.session)) {
-    console.log("isAuthed");
     response.send(compiledLoggedInPage({ 
       "message": "",
       "email": request.session.email
@@ -70,14 +65,14 @@ app.post("/login", (request, response) => {
     response.sendStatus(401);
   }
   console.log("authorizing: " + request.body.email);
-  sess=request.session;
+  var sess = request.session;
   sess.email = request.body.email;
   response.redirect("/");
 });
 
 // Log when Twilio calls us back after a call ends or other status change
 app.post("/twilioCallback", (request, response) => {
-  console.log("status callback for twilio");
+  console.log("status callback for twilio: " + request.body);
   response.json([]);
 });
 
@@ -85,12 +80,80 @@ app.post("/twiml/:name", (request, response) => {
   response.sendFile(__dirname + "/public/" + request.params.name + ".xml");
 });
 
+function validateNumber(input) {
+  if (/^[\+\d,\#]+$/.test(input)) {
+    return input;
+  }
+  return null;
+}
+
+app.post("/api/startcall", (request, response) => {
+  if (!isAuthed(request.session)) {
+    response.sendStatus(401);
+    return;
+  }
+
+  var createParams = {
+    url: process.env.SELF_URL+'twiml/silent-loop',
+    from: process.env.TWILIO_FROM_NUMBER,
+    statusCallback: process.env.SELF_URL+'twilioCallback',
+    statusCallbackMethod: 'POST'
+  };
+
+  var fullNumberText = validateNumber(request.body.number);
+  if (fullNumberText === null) {
+    console.log("number didn't validate" + request.body.number);
+    response.sendStatus(400);
+    return;
+  }
+
+  var numberParts = fullNumberText.split(",,");
+  createParams['to'] = numberParts[0];  
+  if (numberParts.length > 1)  {
+    createParams['sendDigits'] = numberParts[1];
+  }
+
+  var botId = shortid.generate();
+  var call = {
+    botId: botId,
+    callURL: process.env.SELF_URL + "c/" + botId,
+    dateTime: new Date().toISOString(),
+    origInput: request.body.number,
+    creationParams: createParams
+  };
+
+  if (doRealTwilio) {
+    twilioClient.calls
+    .create(createParams)
+    .then(twCall => {
+      call.twilioCallId = twCall.sid;
+      db.get('calls').push(call).write();
+      response.json({
+        "newCallUrl": call.callURL,
+        "status": "callStarted"
+      });
+    },
+    reason => {
+      response.json({
+        "status": "Error starting the call"
+      });
+    }
+    );
+  }
+  else {
+    call.twilioCallId = "mockValue";
+    db.get('calls').push(call).write();
+    response.json({
+      "newCallUrl": call.callURL,
+      "status": "callStarted"
+    });
+  }
+
+});
+/*
 app.post("/startcall", (request, response) => {
 
   if (!isAuthed(request.session)) {
-    console.log("not authorized in connect");
-    console.log(request.session);
-
     response.redirect("/");
     return;
   }
@@ -102,85 +165,143 @@ app.post("/startcall", (request, response) => {
     statusCallbackMethod: 'POST'
   };
 
-  var numberParts = request.body.number.split(",,");
+  var fullNumberText = request.body.number;
+  if (fullNumberText.length >= 10 && /^[\+\d,\#]+$/.test(fullNumberText)) {
+    // If it's just a full phone number, maybe with an extension.
+    if (!fullNumberText.startsWith('+')) {
+      fullNumberText = "+" + fullNumberText;
+    }
+  }
+  else {
+    fullNumberText = zoomParse.pickPhoneNumber(fullNumberText);
+    if (!/^[\+\d,\#]+$/.test(fullNumberText)) {
+      response.send(compiledLoggedInPage({ 
+        "error": "Bad number",
+        "email": request.session.email,
+      }));
+      return;
+    }
+  }
+
+  var numberParts = fullNumberText.split(",,");
   createParams['to'] = numberParts[0];  
   if (numberParts.length > 1)  {
     createParams['sendDigits'] = numberParts[1];
   }
 
-  console.log(createParams);
-  console.log('twilio client now');
   var botId = shortid.generate();
-  var callURL = process.env.SELF_URL + "c/" + botId;
+  var call = {
+    botId: botId,
+    callURL: process.env.SELF_URL + "c/" + botId,
+    dateTime: new Date().toISOString(),
+    origInput: request.body.number,
+    creationParams: createParams
+  };
   
   if (doRealTwilio) {
+    console.log("calling using Twilio");
+    console.log(createParams);
     twilioClient.calls
     .create(createParams)
-    .then(call => {
-      db.get('calls')
-      .push({ 
-        id: 1, 
-        url: callURL, 
-        botId: botId, 
-        twilioCallId: call.sid,
-        dateTime: new Date().toString()
-      })
-      .write();
-    
+    .then(twCall => {
+      call.twilioCallId = twCall.sid;
+      db.get('calls').push(call).write();
       response.send(compiledLoggedInPage({ 
         "email": request.session.email,
-        "newCallUrl": callURL,
+        "newCallUrl": call.callURL,
         "status": "callStarted"
       }));
     });
   }
   else {
-    // Do the same thing, just use "temp" for the callId.
-    db.get('calls')
-    .push({ 
-      id: 1, 
-      url: callURL, 
-      botId: botId, 
-      twilioCallId: 'mockValue',
-      dateTime: new Date().toString()
-    })
-    .write();
-  
+    console.log("Twilio disabled. Fake call logged: " + createParams);
+    call.twilioCallId = "mockValue";
+    db.get('calls').push(call).write();
     response.send(compiledLoggedInPage({ 
       "email": request.session.email,
-      "newCallUrl": callURL,
+      "newCallUrl": call.callURL,
       "status": "callStarted"
     }));
   }
 });
+*/
 
 app.get("/c/:callId", (request, response) => {
-  console.log(request.params.callId);
   var call = db.get('calls')
-  .find({ botId:  request.params.callId})
+  .find({ botId: request.params.callId})
   .value();
 
   if (!call) {
     response.send(compiledCallPage({ 
-      error: "Link has expired."
+      error: "Link has expired.",
+      "call": { botId: 'temp'}
     }));      
     return;
   }
-  console.log(call.twilioCallId);
-  console.log(call.dateTime);
 
-  console.log(sounds);
-  twilioClient.calls(call.twilioCallId)
-  .fetch()
-  .then(twCall => {
-    response.send(compiledCallPage({ 
-      "status": twCall.status,
+  if (doRealTwilio) {
+    twilioClient.calls(call.twilioCallId)
+    .fetch()
+    .then(twCall => {
+      response.send(compiledCallPage({ 
+        "email": request.session.email,
+        "call": call    }));    
+    },
+    reason => {
+      console.log(reason);
+      response.json(["Call not found"]);
+    }
+    );
+  }
+  else {
+    response.send(compiledCallPage({
       "email": request.session.email,
-      "twCall": twCall,
-      "sounds": sounds,
-      "call": call    }));    
-  });
+      "call": call
+    }));  
+  }
 });
+
+function doTwilioPlay(request, call) {
+
+  console.log(request.body);
+  var soundName = "applause";
+  if (request.body.sound in soundList) {
+    soundName = request.body.sound;
+  }
+  console.log(soundName);
+  if (doRealTwilio) {
+
+    twilioClient.calls(call.twilioCallId)
+    .update({
+      url: process.env.SELF_URL + 'twiml/' + soundName,
+    })
+    .then(call => {
+      console.log(call.to);
+    },
+    reason => {
+      console.log('reason');
+      console.log(reason);
+    }
+    );
+  }
+}
+
+function doTwilioHangup(call) {
+
+  if (doRealTwilio) {
+    twilioClient.calls(call.twilioCallId)
+    .update({status: 'completed'})
+    .then(call => {
+      console.log("hang up");
+      console.log(call.to);
+    },
+    reason => {
+      console.log('reason');
+      console.log(reason);
+    }
+    );
+  }
+}
 
 app.post("/c/:callId/:action", (request, response) => {
   console.log(request.params.callId);
@@ -196,31 +317,42 @@ app.post("/c/:callId/:action", (request, response) => {
   }
 
   if (request.params.action === 'play') {
-    console.log("playing a sound");
-    if (doRealTwilio) {
-      console.log("twilioCallId: "+call.twilioCallId);
-      console.log(request.body.sound);
-      var soundName = "applause";
-      if (request.body.sound in sounds) {
-        soundName = request.body.sound;
-      }
-      twilioClient.calls(call.twilioCallId)
-      .update({
-        url: process.env.SELF_URL + 'twiml/' + soundName,
-      })
-      .then(call => {
-        console.log(call.to);
-      },
-      reason => {
-        console.log('reason');
-        console.log(reason);
-      }
-      );
+    doTwilioPlay(request, call);
+    response.json({"status": "played"});
+  }
+  else if (request.params.action === 'sounds') {
+    response.json(soundList);
+  }
+  else if (request.params.action === 'hangup') {
+    console.log("hanging up");
+    console.log(call);
+    doTwilioHangup(call);
+  }
+  else if (request.params.action === 'status') {
+    console.log("in status");
+    if (call.twilioCallId === "mockValue" || !doRealTwilio) {
+      response.json({
+        call: call,
+        twilioStatus: "invalid",
+      });
+      return;
     }
-    var resp = {
-      "status": "complete",
-    };
-    response.json(resp);
+    
+    twilioClient.calls(call.twilioCallId)
+    .fetch()
+    .then(twCall => {
+      response.json({
+        call: call,
+        twilioStatus: twCall.status,
+      });
+    },
+    reason => {
+      response.json({
+        call: call,
+        twilioStatus: "invalid",
+      });
+    }
+    );
   }
   else {
     var resp = {

@@ -11,14 +11,8 @@ html
             p(style="color: #33cc33") Call started. 
                 - var url = newCallUrl
                 a(href=`${url}`) Link
-        p(style="color: #ff0000") #{error}
-        form(action="/startcall", method="POST")
-            label(for="number")
-                input(
-                    name="number"
-                    type="text"
-                    required
-                    placeholder="ex: +14086380968,,7323580#"
-                )
-                button(type="submit" id="submit-dream") Start a Call                    
+        include react.pug
+        div(id="callstarter")
+        script(src="/zoom-invite.js")
+        script(src="/callstarter.js" type="text/babel")               
     //- include foot.pug
