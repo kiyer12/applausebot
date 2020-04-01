@@ -10,5 +10,9 @@ module.exports = {
   "goodmusic": {
     soundURL: "http://demo.twilio.com/docs/classic.mp3",
     label: "Never Gonna Give You Up 🥴",
+  },
+  "announce": {
+    soundURL: "https://applause-bot.s3-us-west-2.amazonaws.com/announce.mp3",
+    label: "Announce Chime"
   }
 }

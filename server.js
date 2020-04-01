@@ -3,11 +3,11 @@ const session = require('express-session');
 const pug = require('pug');
 const shortid = require('shortid');
 const low = require('lowdb')
+const fs = require('fs')
 const FileSync = require('lowdb/adapters/FileSync')
-const zoomParse = require('./zoom-invite-parser.js')
 const soundList = require('./sound-list.js')
 
-const doRealTwilio = false;
+const doRealTwilio = true;
 
 const app = express();
 app.use(session(
@@ -24,8 +24,7 @@ app.use(express.json()); // Parse JSON bodies (as sent by API clients)
 
 const adapter = new FileSync('.data/db.json')
 const db = low(adapter);
-db.defaults({ calls: [], count: 0 })
-  .write();
+db.defaults({ calls: [], count: 0 }).write();
 
 const twilioAccountSid = process.env.TWILIO_ACCOUNT_ID;
 const twilioAccountToken = process.env.TWILIO_TOKEN;
@@ -77,7 +76,19 @@ app.post("/twilioCallback", (request, response) => {
 });
 
 app.post("/twiml/:name", (request, response) => {
-  response.sendFile(__dirname + "/public/" + request.params.name + ".xml");
+
+  if (request.params.name === "silent-loop") {
+    response.sendFile(__dirname + "/public/" + request.params.name + ".xml");
+  }
+  else if (request.params.name in soundList) {
+    var URL = soundList[ request.params.name ].soundURL;
+    var xml = fs.readFileSync(__dirname + "/public/template-playsound-twiml.xml").toString();
+    xml = xml.replace('%%SOUND_URL%%', URL);      
+    response.send(xml);
+  }
+  else {
+    response.sendStatus(404);
+  }
 });
 
 function validateNumber(input) {
@@ -94,7 +105,7 @@ app.post("/api/startcall", (request, response) => {
   }
 
   var createParams = {
-    url: process.env.SELF_URL+'twiml/silent-loop',
+    url: process.env.SELF_URL+'twiml/announce',
     from: process.env.TWILIO_FROM_NUMBER,
     statusCallback: process.env.SELF_URL+'twilioCallback',
     statusCallbackMethod: 'POST'
@@ -150,81 +161,20 @@ app.post("/api/startcall", (request, response) => {
   }
 
 });
-/*
-app.post("/startcall", (request, response) => {
 
+app.get("/calls", (request, response) => {
   if (!isAuthed(request.session)) {
-    response.redirect("/");
+    response.sendStatus(401);
     return;
   }
+  var calls = db.get('calls')
+  .takeRight(5)
+  .sortBy('dateTime')
+  .reverse()
+  .value();
 
-  var createParams = {
-    url: process.env.SELF_URL+'twiml/silent-loop',
-    from: process.env.TWILIO_FROM_NUMBER,
-    statusCallback: process.env.SELF_URL+'twilioCallback',
-    statusCallbackMethod: 'POST'
-  };
-
-  var fullNumberText = request.body.number;
-  if (fullNumberText.length >= 10 && /^[\+\d,\#]+$/.test(fullNumberText)) {
-    // If it's just a full phone number, maybe with an extension.
-    if (!fullNumberText.startsWith('+')) {
-      fullNumberText = "+" + fullNumberText;
-    }
-  }
-  else {
-    fullNumberText = zoomParse.pickPhoneNumber(fullNumberText);
-    if (!/^[\+\d,\#]+$/.test(fullNumberText)) {
-      response.send(compiledLoggedInPage({ 
-        "error": "Bad number",
-        "email": request.session.email,
-      }));
-      return;
-    }
-  }
-
-  var numberParts = fullNumberText.split(",,");
-  createParams['to'] = numberParts[0];  
-  if (numberParts.length > 1)  {
-    createParams['sendDigits'] = numberParts[1];
-  }
-
-  var botId = shortid.generate();
-  var call = {
-    botId: botId,
-    callURL: process.env.SELF_URL + "c/" + botId,
-    dateTime: new Date().toISOString(),
-    origInput: request.body.number,
-    creationParams: createParams
-  };
-  
-  if (doRealTwilio) {
-    console.log("calling using Twilio");
-    console.log(createParams);
-    twilioClient.calls
-    .create(createParams)
-    .then(twCall => {
-      call.twilioCallId = twCall.sid;
-      db.get('calls').push(call).write();
-      response.send(compiledLoggedInPage({ 
-        "email": request.session.email,
-        "newCallUrl": call.callURL,
-        "status": "callStarted"
-      }));
-    });
-  }
-  else {
-    console.log("Twilio disabled. Fake call logged: " + createParams);
-    call.twilioCallId = "mockValue";
-    db.get('calls').push(call).write();
-    response.send(compiledLoggedInPage({ 
-      "email": request.session.email,
-      "newCallUrl": call.callURL,
-      "status": "callStarted"
-    }));
-  }
+  response.json(calls);
 });
-*/
 
 app.get("/c/:callId", (request, response) => {
   var call = db.get('calls')
@@ -257,7 +207,7 @@ app.get("/c/:callId", (request, response) => {
     response.send(compiledCallPage({
       "email": request.session.email,
       "call": call
-    }));  
+    }));
   }
 });
 
@@ -304,15 +254,12 @@ function doTwilioHangup(call) {
 }
 
 app.post("/c/:callId/:action", (request, response) => {
-  console.log(request.params.callId);
   var call = db.get('calls')
   .find({ botId:  request.params.callId})
   .value();
 
   if (!call) {
-    response.send(compiledCallPage({ 
-      error: "Link has expired or the call is no longer valid."
-    }));      
+    response.sendStatus(404);
     return;
   }
 
@@ -324,12 +271,10 @@ app.post("/c/:callId/:action", (request, response) => {
     response.json(soundList);
   }
   else if (request.params.action === 'hangup') {
-    console.log("hanging up");
     console.log(call);
     doTwilioHangup(call);
   }
   else if (request.params.action === 'status') {
-    console.log("in status");
     if (call.twilioCallId === "mockValue" || !doRealTwilio) {
       response.json({
         call: call,
@@ -339,26 +284,13 @@ app.post("/c/:callId/:action", (request, response) => {
     }
     
     twilioClient.calls(call.twilioCallId)
-    .fetch()
-    .then(twCall => {
-      response.json({
-        call: call,
-        twilioStatus: twCall.status,
-      });
-    },
-    reason => {
-      response.json({
-        call: call,
-        twilioStatus: "invalid",
-      });
-    }
+    .fetch().then(
+      twCall => { response.json({ call: call, twilioStatus: twCall.status, }); },
+      reason => { response.json({ call: call, twilioStatus: "invalid",}); }
     );
   }
   else {
-    var resp = {
-      "status": "unknown action: " + request.params.action,
-    };
-    response.json(resp);
+    response.json({"status": "unknown action: " + request.params.action});
   }
 });
 

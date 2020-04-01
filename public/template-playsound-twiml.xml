@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Play>https://applause-bot.s3-us-west-2.amazonaws.com/cheer.mp3</Play>
+    <Play>%%SOUND_URL%%</Play>
     <Redirect method="POST">/twiml/silent-loop</Redirect>
 </Response>

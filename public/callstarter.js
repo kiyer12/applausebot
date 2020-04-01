@@ -74,7 +74,7 @@ class CallStarter extends React.Component {
     return (
       <div>
         <textarea
-        style={{width:"300px", height:"100px"}}
+        style={{width:"300px", height:"100px", resize: "none"}}
         name="blah"
         required
         placeholder="Phone number, or extension, or a zoom invite. ex: +14086380968,,7323580# or just paste the zoom invite"
@@ -86,8 +86,59 @@ class CallStarter extends React.Component {
         </div>
         <button onClick={ evt => this.setState({ inputValue:"+13105085170"}) } > Test Number
         </button>
+        <CallList />
       </div>
     );
+  }
+}
+
+class CallList extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { 
+      callList: null
+    };
+
+    this.fetchCalls();
+  }
+
+  fetchCalls() {
+    fetch("/calls", { 
+      method: 'GET'
+    })
+    .then((response) => {
+      return response.json();
+    })
+    .then((data) => {
+      this.setState({callList: data});
+    })
+  }
+
+  render() {
+    if (this.state.callList === null) {
+      return (
+        <div></div>
+      );
+    }
+    else {
+      return (
+        <div>
+          <h3>Recent Calls</h3>
+          {
+            this.state.callList.map( (value, index) => {
+              return (<div key={value.callURL}>
+                <a href={value.callURL}> Call to {value.creationParams.to} </a> 
+                <span style={{ "marginLeft":"10px", color: 
+              "#999" }}> 
+                  { moment(value.dateTime).format('MMMM Do YYYY, h:mm:ss a') } 
+                </span>
+                </div>);
+            }
+            )
+          }
+        </div>
+      )
+    }
   }
 }
 

@@ -9,37 +9,44 @@ class SoundBoard extends React.Component {
       liked: false,
       callInfo: null
     };
+
+    this.fetchCallInfo();
+    this.timer = setInterval(() => this.fetchCallInfo(), 15000);
+  }
+
+  fetchCallInfo() {
+    fetch("/c/" + callId + "/status", {
+      method: 'POST'})
+    .then((response) => {
+      return response.json();
+    })
+    .then((data) => {
+      console.log(data);
+      this.setState({callInfo: data});
+
+      clearInterval(this.timer);
+      switch(data.twilioStatus) {
+        case "queued": 
+        case "ringing":
+          this.timer = setInterval(() => this.fetchCallInfo(), 3000);
+          break;
+        case "in-progress":
+          this.timer = setInterval(() => this.fetchCallInfo(), 5000);
+          break;
+        case "complete":
+        case "invalid":
+          // do nothing anymore, won't change.
+        default:
+          this.timer = setInterval(() => this.fetchCallInfo(), 15000);
+      }
+    })
   }
 
   render() {
     return (
       <div>
-      <CallInfo value={callId} />
+      <CallInfo callInfo={this.state.callInfo} value={callId} />
       <SoundList />
-      </div>
-    );
-  }
-}
-
-class CallStart extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { 
-      liked: false,
-      callInfo: null
-    };
-
-  }
-  render() {
-    if (this.state.liked) {
-      return (
-        <ProgressSpinner />
-      );
-    }
-
-    return (
-      <div>
-        Here I am.
       </div>
     );
   }
@@ -83,7 +90,9 @@ class SoundList extends React.Component {
         <div className="soundList">
           { 
             Object.keys(this.state.soundList).map( 
-              s => { return <SoundButton key={s} value={s} label={this.state.soundList[s].label} /> 
+              s => { return <SoundButton key={s} value={s} 
+                              sound={this.state.soundList[s]}
+                              label={this.state.soundList[s].label} /> 
             })
           }
         </div>
@@ -97,7 +106,8 @@ class SoundButton extends React.Component {
     super(props);
     this.state = {
       value: props.value,
-      label: props.label
+      label: props.label,
+      sound: props.sound
     };
   }
 
@@ -124,15 +134,74 @@ class SoundButton extends React.Component {
 
   render() {
     return (
-      <button className="soundButton" onClick={() => {
-        this.playSound(this.state.value, data => {
-          console.log("return data came back", data);
-        });
-        this.setState({value: 'X'});
-      }
-      }>
-        {this.state.label}
-      </button>
+      <span className="sound">
+        <button className="soundButton" onClick={() => {
+          this.playSound(this.state.value, data => {
+            console.log("return data came back", data);
+          });
+        }
+        }>
+          {this.state.label}
+        </button>
+        <SoundPreview sound={ this.state.sound.soundURL } />
+      </span>
+    );
+  }
+}
+
+class SoundPreview extends React.Component {
+  constructor(props) {
+    super(props);
+    this.audioTag = React.createRef();
+    this.state = {
+      sound: props.sound,
+      buttonTitle: "Preview >",
+      progress: "0%"
+    };
+
+  }
+
+  buttonTitle() {
+    if (this.audioTag.current === null || this.audioTag.current.paused)
+      return "Preview >";
+    else return "|| Stop";
+  }
+
+  updateTime(evt) {
+    var p = this.audioTag.current.currentTime / this.audioTag.current.duration;
+    this.setState( { progress: Math.round(p*100) + "%" });
+  }
+
+  ended(evt) {
+    this.setState( { progress: "0%" });
+    this.setState( { buttonTitle: "Preview >" });
+  }
+
+  previewClick() {
+    if (this.audioTag.current.paused) {
+      this.audioTag.current.play();
+      this.setState({ buttonTitle: "|| Pause"});
+    }
+    else {
+      this.audioTag.current.pause();
+      this.setState({ buttonTitle: "Preview >"});
+    }
+  }
+
+  render() {
+    return (
+        <div className="soundPreviewContainer">
+          <button className="soundPreviewButton" onClick={() => { this.previewClick() }}>
+            { this.state.buttonTitle }
+          </button>
+          <div style={{ height:"2px", background:"#000", width:this.state.progress}}></div>
+          <audio ref={ this.audioTag } 
+            onEnded= { () => { this.ended() }}
+            onTimeUpdate= {  (evt) => { this.updateTime(evt) } }
+          >
+            <source src={ this.state.sound } />
+          </audio>
+        </div>
     );
   }
 }
@@ -141,28 +210,7 @@ class CallInfo extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      callInfo: null,
     };
-
-    this.fetchCallInfo();    
-    // this.timer = setInterval(() => this.fetchCallInfo(), 15000);
-  }
-
-  fetchCallInfo() {
-    // this.setState((state, props) => {
-      // return {callInfo: null};
-    // });
-    fetch("/c/" + callId + "/status", {
-      method: 'POST'})
-    .then((response) => {
-      return response.json();
-    })
-    .then((data) => {
-      console.log(data);
-      this.setState((state, props) => {
-        return {callInfo: data};
-      });
-    })
   }
 
   hangupCall() {
@@ -175,25 +223,30 @@ class CallInfo extends React.Component {
   }
 
   render() {
-    if (this.state.callInfo !== null) {
-      return (
-        <div className="callList">
-          <div>To: {this.state.callInfo.call.creationParams.to}</div>
-          <div>Started: {
-            moment(this.state.callInfo.call.dateTime).fromNow()
-          }
-            <span style={{color: 'darkgray' ,fontSize: '12px', marginLeft: '10px'}}>{ 
-              moment(this.state.callInfo.call.dateTime) 
-              .format('MMMM Do YYYY, h:mm:ss a')
-            }</span>
-          </div>
-          <div>Call is {this.state.callInfo.twilioStatus}.</div>
-          <button className="callButton" onClick={() => {
-            console.log("hang up clicked");
+    if (this.props.callInfo !== null) {
+
+      var hangupButton;
+      if (this.props.callInfo.twilioStatus !== "completed") {
+        hangupButton = (
+          <button className="hangupButton" onClick={() => {
             this.hangupCall();
           }}>
             ☎️ Hang Up
           </button>
+        )
+      }
+      var creationParams = this.props.callInfo.call.creationParams;
+      var call = this.props.callInfo.call;
+      return (
+        <div className="callList">
+          <span className="callTitle">Call {creationParams.to} {creationParams.sendDigits}</span>
+          <span style={{color: '#666' ,fontSize: '12px'}}>{ 
+              moment(call.dateTime).fromNow() + ", " +
+              moment(call.dateTime).format('MMMM Do YYYY, h:mm:ss a')
+            }
+          </span>
+          <div>Call is {this.props.callInfo.twilioStatus}.</div>
+          { hangupButton }
         </div>
       );
     }

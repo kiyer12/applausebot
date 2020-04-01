@@ -1,5 +1,3 @@
-/* this file is loaded by index.html and styles the page */
-
 * {
   box-sizing: border-box;
 }
@@ -17,73 +15,81 @@ h1 {
   line-height: 1.1;
 }
 
-form {
-  background-color: #eee;
-  display: grid;
-  grid-gap: 1em;
-  padding: 1em;
-  max-width: 40ch;
-}
-
-input {
-  border: 1px solid silver;
-  display: block;
-  font-size: 16px;
-  margin-bottom: 10px;
-  padding: 5px;
-  width: 100%;
-}
-
-form button {
-  background-color: #bbbbf2;
-  border: 2px solid currentColor;
-  border-radius: .25em;
-  cursor: pointer;
-  font-size: inherit;
-  line-height: 1.4em;
-  padding: 0.25em 1em;
-  max-width: 20ch;
-}
-
-form button:hover {
-  background-color: lavender;
-}
-
-footer {
-  margin-top: 3em;
-  padding-top: 1.5em;
-  border-top: 1px solid lightgrey;
-}
-
 .soundList {
   padding-top:20px;
   padding-bottom:20px;
 }
 
+.sound {
+  display: inline-block;
+  width: 100px;
+  margin-right: 5px;
+}
+
 .soundButton {
   height: 50px;
-  margin-left: 10px;
+  width: 100px;
   background: #ddd;
+  border:0;
+}
+
+.soundButton:hover {
+  background: #cfc;
+}
+
+.soundPreviewContainer {
+  margin-bottom: 10px;
+  width: 100px;
+}
+
+.soundPreviewButton {
+  height: 20px;
+  background: #eee;
+  border: none;
+  width: 100%;
+}
+
+.soundPreviewButton:hover {
+  background: #ccc;
+}
+
+.callTitle {
+  font-size: 16px;
+  font-weight: bold;
+  margin-right: 20px;
+}
+
+.hangupButton {
+  font-weight: bold;
+  height: 50px;
+  min-width: 100px;
+  background: #eee;
+
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.hangupButton:hover {
+  background: #fcc;
 }
 
 .callButton {
   font-weight: bold;
-  border: 1px solid black;
-  height: 25px;
-  margin: 10px;
+  height: 50px;
+  min-width: 100px;
+  background: #eee;
+
+  padding: 10px;
+  margin-top: 10px;
+  border:0;
 }
+
 .callButton:hover {
-  background: #ccc;
+  background: #9fc;
 }
 
 .callButtonValidated {
-  font-weight: bold;
-  border: 1px solid black;
-  height: 25px;
-  margin: 10px;
-  
-  border-color: lime;
-  border-width: 5px;
+  background: #cfc;
 }
 
 .lds-default {

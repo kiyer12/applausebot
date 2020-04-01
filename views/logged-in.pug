@@ -6,7 +6,6 @@ html
         p A live soundboard for calls
             if email
                  span(style="color: #AAAAAA") - #{email}
-        p(style="color: #ff0000") #{error}
         if status && status === "callStarted"
             p(style="color: #33cc33") Call started. 
                 - var url = newCallUrl
@@ -14,5 +13,6 @@ html
         include react.pug
         div(id="callstarter")
         script(src="/zoom-invite.js")
+        script(src="/moment.min.js")
         script(src="/callstarter.js" type="text/babel")               
     //- include foot.pug
