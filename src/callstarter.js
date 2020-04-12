@@ -1,5 +1,10 @@
 'use strict';
 
+import React from 'react'
+import ReactDOM from 'react-dom'
+import moment from 'moment'
+import ZoomInvite from './zoom-invite.js'
+
 const e = React.createElement;
 
 class CallStarter extends React.Component {
@@ -79,13 +84,8 @@ class CallStarter extends React.Component {
         required
         placeholder="Phone number, or extension, or a zoom invite. ex: +14086380968,,7323580# or just paste the zoom invite"
         onChange={evt => this.updateInputValue(evt)}
-        >
-        </textarea>
-        <div>
-          { callButton }
-        </div>
-        <button onClick={ evt => this.setState({ inputValue:"+13105085170"}) } > Test Number
-        </button>
+        />    
+        <div>{ callButton }</div>
         <CallList />
       </div>
     );

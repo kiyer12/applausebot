@@ -22,3 +22,5 @@ var ZoomInvite = {
       return numberParts[0];
     }
 };
+
+export { ZoomInvite as default };

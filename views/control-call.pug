@@ -7,8 +7,6 @@ html
             if email
                  span(style="color: #AAAAAA") - #{email}
         div(id="soundboard")
-        include react.pug
-        script(src="/moment.min.js")
-        script(src="/soundboard.js" type="text/babel")
         script.
             var callId = "#{call.botId}";
+        script(src="/soundboard.js")

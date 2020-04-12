@@ -39,15 +39,18 @@ function isAuthed(sess) {
 
 // Compile our templates
 const compiledLoggedInPage = pug.compileFile(__dirname + "/views/logged-in.pug");
+const makeCallPage = pug.compileFile(__dirname + "/views/make-call.pug");
 const compiledCallPage = pug.compileFile(__dirname + "/views/call.pug");
+const controlCallPage = pug.compileFile(__dirname + "/views/control-call.pug");
+
 
 // make all the files in 'public' available
 app.use(express.static("public"));
+app.use(express.static("dist"));
 
 app.get("/", (request, response) => {
   if (isAuthed(request.session)) {
-    response.send(compiledLoggedInPage({ 
-      "message": "",
+    response.send(makeCallPage({ 
       "email": request.session.email
     }));
   }
@@ -182,7 +185,7 @@ app.get("/c/:callId", (request, response) => {
   .value();
 
   if (!call) {
-    response.send(compiledCallPage({ 
+    response.send(controlCallPage({ 
       error: "Link has expired.",
       "call": { botId: 'temp'}
     }));      
@@ -193,7 +196,7 @@ app.get("/c/:callId", (request, response) => {
     twilioClient.calls(call.twilioCallId)
     .fetch()
     .then(twCall => {
-      response.send(compiledCallPage({ 
+      response.send(controlCallPage({ 
         "email": request.session.email,
         "call": call    }));    
     },
@@ -204,7 +207,7 @@ app.get("/c/:callId", (request, response) => {
     );
   }
   else {
-    response.send(compiledCallPage({
+    response.send(controlCallPage({
       "email": request.session.email,
       "call": call
     }));

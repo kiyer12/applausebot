@@ -1,5 +1,9 @@
 'use strict';
 
+import React from 'react'
+import ReactDOM from 'react-dom'
+import moment from 'moment'
+
 const e = React.createElement;
 
 class SoundBoard extends React.Component {
@@ -36,6 +40,7 @@ class SoundBoard extends React.Component {
         case "complete":
         case "invalid":
           // do nothing anymore, won't change.
+          break;
         default:
           this.timer = setInterval(() => this.fetchCallInfo(), 15000);
       }
@@ -46,7 +51,7 @@ class SoundBoard extends React.Component {
     return (
       <div>
       <CallInfo callInfo={this.state.callInfo} value={callId} />
-      <SoundList />
+      <SoundList callInfo={this.state.callInfo} />
       </div>
     );
   }
@@ -76,28 +81,21 @@ class SoundList extends React.Component {
   }
 
   render() {
-
     if (this.state.soundList === null) {
-      return (
-        <div>
-          Loading...
-          <ProgressSpinner />
-        </div>
-      );
+      return (<div> Loading... <ProgressSpinner /></div>);
     }
-    else {
-      return (
-        <div className="soundList">
-          { 
-            Object.keys(this.state.soundList).map( 
-              s => { return <SoundButton key={s} value={s} 
-                              sound={this.state.soundList[s]}
-                              label={this.state.soundList[s].label} /> 
-            })
-          }
-        </div>
-      );
+    else if (this.props.callInfo && this.props.callInfo.twilioStatus !== "completed") {
+        return (<div className="soundList">
+            { 
+              Object.keys(this.state.soundList).map( 
+                s => { return <SoundButton key={s} value={s} 
+                                sound={this.state.soundList[s]}
+                                label={this.state.soundList[s].label} /> 
+               })
+            }
+          </div>);
     }
+    else { return (<div></div>); }
   }
 }
 
