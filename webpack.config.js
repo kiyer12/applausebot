@@ -4,7 +4,7 @@ const webpack = require("webpack");
 module.exports = {
   // Which start file(s) to build the dependency graph from
   entry: {
-    main: './src/index.js',
+    main: './src/callstarter.js',
     soundboard: './src/soundboard.js'
   }, 
   // Where Webpack should create the bundle(s) and what to call them.
