@@ -38,9 +38,7 @@ function isAuthed(sess) {
 }
 
 // Compile our templates
-const compiledLoggedInPage = pug.compileFile(__dirname + "/views/logged-in.pug");
 const makeCallPage = pug.compileFile(__dirname + "/views/make-call.pug");
-const compiledCallPage = pug.compileFile(__dirname + "/views/call.pug");
 const controlCallPage = pug.compileFile(__dirname + "/views/control-call.pug");
 
 
