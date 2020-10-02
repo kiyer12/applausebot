@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+   <!-- loop=0 means loop forever -->
+   <Play loop="0">https://applause-bot.s3-us-west-2.amazonaws.com/silence.mp3</Play>
+</Response>

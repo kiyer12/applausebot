@@ -1,0 +1,10 @@
+html
+    include head.pug
+    body
+        h1 
+            a(href="/") ApplauseBot
+        p A live soundboard for calls
+            if email
+                 span(style="color: #AAAAAA") - #{email}
+        div(id="callstarter")
+        script(src="/main.js")
